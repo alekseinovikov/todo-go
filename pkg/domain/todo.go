@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 type Todo struct {
 	Id          uint16
 	Title       string
@@ -22,4 +24,8 @@ func (t *Todo) GetTitle() string {
 
 func (t *Todo) GetDescription() string {
 	return t.Description
+}
+
+func (t *Todo) String() string {
+	return fmt.Sprintf("%s", t.Title)
 }

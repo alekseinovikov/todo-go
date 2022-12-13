@@ -2,6 +2,7 @@ package internal
 
 import (
 	. "github.com/samber/mo"
+	"sort"
 	"sync"
 	. "todo-go/pkg/domain"
 )
@@ -12,44 +13,48 @@ type InMemoryTodoRepositoryImpl struct {
 	Todos  map[uint16]Todo
 }
 
-func (t *InMemoryTodoRepositoryImpl) GetById(id uint16) (Option[*Todo], error) {
+func (t *InMemoryTodoRepositoryImpl) GetById(id uint16) (Option[Todo], error) {
 	t.Rw.RLock()
 	defer t.Rw.RUnlock()
 
 	if todo, ok := t.Todos[id]; ok {
-		return Some(&todo), nil
+		return Some(todo), nil
 	}
 
-	return None[*Todo](), nil
+	return None[Todo](), nil
 }
 
-func (t *InMemoryTodoRepositoryImpl) GetCompleted() ([]*Todo, error) {
+func (t *InMemoryTodoRepositoryImpl) GetCompleted() ([]Todo, error) {
 	t.Rw.RLock()
 	defer t.Rw.RUnlock()
 
-	result := make([]*Todo, 0)
+	result := make([]Todo, 0)
 	for _, v := range t.Todos {
 		if v.Completed {
-			result = append(result, &v)
+			result = append(result, v)
 		}
 	}
+
+	sortByIdAsc(result)
 	return result, nil
 }
 
-func (t *InMemoryTodoRepositoryImpl) GetUncompleted() ([]*Todo, error) {
+func (t *InMemoryTodoRepositoryImpl) GetUncompleted() ([]Todo, error) {
 	t.Rw.RLock()
 	defer t.Rw.RUnlock()
 
-	result := make([]*Todo, 0)
+	result := make([]Todo, 0)
 	for _, v := range t.Todos {
 		if !v.Completed {
-			result = append(result, &v)
+			result = append(result, v)
 		}
 	}
+
+	sortByIdAsc(result)
 	return result, nil
 }
 
-func (t *InMemoryTodoRepositoryImpl) Add(todo AddTodo) (*Todo, error) {
+func (t *InMemoryTodoRepositoryImpl) Add(todo AddTodo) (Todo, error) {
 	t.Rw.Lock()
 	defer t.Rw.Unlock()
 
@@ -62,29 +67,35 @@ func (t *InMemoryTodoRepositoryImpl) Add(todo AddTodo) (*Todo, error) {
 	}
 
 	t.Todos[t.LastId] = newTodo
-	return &newTodo, nil
+	return newTodo, nil
 }
 
-func (t *InMemoryTodoRepositoryImpl) MarkCompleted(id uint16) (Option[*Todo], error) {
+func (t *InMemoryTodoRepositoryImpl) MarkCompleted(id uint16) (Option[Todo], error) {
 	t.Rw.Lock()
 	defer t.Rw.Unlock()
 
 	if todo, ok := t.Todos[id]; ok {
 		todo.Completed = true
-		return Some(&todo), nil
+		return Some(todo), nil
 	}
 
-	return None[*Todo](), nil
+	return None[Todo](), nil
 }
 
-func (t *InMemoryTodoRepositoryImpl) MarkNotCompleted(id uint16) (Option[*Todo], error) {
+func (t *InMemoryTodoRepositoryImpl) MarkNotCompleted(id uint16) (Option[Todo], error) {
 	t.Rw.Lock()
 	defer t.Rw.Unlock()
 
 	if todo, ok := t.Todos[id]; ok {
 		todo.Completed = false
-		return Some(&todo), nil
+		return Some(todo), nil
 	}
 
-	return None[*Todo](), nil
+	return None[Todo](), nil
+}
+
+func sortByIdAsc(slice []Todo) {
+	sort.Slice(slice, func(i, j int) bool {
+		return slice[i].Id < slice[j].Id
+	})
 }

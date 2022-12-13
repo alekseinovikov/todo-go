@@ -6,10 +6,9 @@ import (
 )
 
 func NewRenderer(service service.TodoService) Renderer {
-	return &PTermRenderer{Area: nil, Service: service, Selected: nil}
+	return &TeaRenderer{Service: service, CursorPointer: 0}
 }
 
 type Renderer interface {
-	PrintLogo()
-	PrepareDisplay()
+	Start()
 }

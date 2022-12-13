@@ -11,6 +11,5 @@ func main() {
 	svs := service.NewService(repo)
 	renderer := render.NewRenderer(svs)
 
-	renderer.PrintLogo()
-	renderer.PrepareDisplay()
+	renderer.Start()
 }

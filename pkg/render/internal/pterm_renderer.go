@@ -1,76 +1,95 @@
 package internal
 
 import (
-	"github.com/pterm/pterm"
-	"github.com/pterm/pterm/putils"
-	"strings"
+	"fmt"
+	tea "github.com/charmbracelet/bubbletea"
+	"os"
 	. "todo-go/pkg/domain"
 	"todo-go/pkg/service"
 )
 
-type PTermRenderer struct {
-	Area     *pterm.AreaPrinter
-	Service  service.TodoService
-	Selected *Todo
+type TeaRenderer struct {
+	Service       service.TodoService
+	CursorPointer int
+	Selected      *Todo
+	NotCompleted  []Todo
 }
 
-func (P *PTermRenderer) PrintLogo() {
-	s, _ := pterm.DefaultBigText.WithLetters(
-		putils.LettersFromStringWithRGB("T", pterm.NewRGB(255, 215, 0)),
-		putils.LettersFromStringWithStyle("O", pterm.NewStyle(pterm.FgWhite)),
-		putils.LettersFromStringWithRGB("D", pterm.NewRGB(255, 215, 0)),
-		putils.LettersFromStringWithStyle("O", pterm.NewStyle(pterm.FgWhite)),
-	).Srender()
-	pterm.DefaultCenter.Println(s) // Print BigLetters with the default CenterPrinter
+func (R *TeaRenderer) Start() {
+	p := tea.NewProgram(R)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
 }
 
-func (P *PTermRenderer) PrepareDisplay() {
-	P.Area, _ = pterm.DefaultArea.WithCenter().Start()
+func (R *TeaRenderer) Init() tea.Cmd {
+	R.loadNotCompleted()
+	R.updateSelected()
 
-	notCompleted, _ := P.Service.GetUncompleted()
-
-	listPanel := P.sprintListPanel(notCompleted)
-	detailsPanel := P.sprintDetailsPanel(P.Selected)
-	mainPanel := P.sprintMainPanel(listPanel, detailsPanel)
-
-	P.Area.Update(mainPanel)
+	// Just return `nil`, which means "no I/O right now, please."
+	return nil
 }
 
-func (P *PTermRenderer) updateArea(mainPanel string) {
-	P.Area.Update(mainPanel)
-}
+func (R *TeaRenderer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
 
-func (P *PTermRenderer) sprintMainPanel(listPanel, detailsPanel string) string {
-	panels, _ := pterm.DefaultPanel.WithPanels(pterm.Panels{
-		{{Data: listPanel}, {Data: detailsPanel}},
-	}).Srender()
+	case tea.KeyMsg:
+		switch msg.String() {
 
-	return pterm.DefaultBox.WithTitle("Todos").
-		WithTitleBottomRight().
-		WithRightPadding(0).
-		WithBottomPadding(0).
-		Sprintln(panels)
-}
+		case "ctrl+c", "q":
+			return R, tea.Quit
 
-func (P *PTermRenderer) sprintListPanel(todos []*Todo) string {
-	strTodos := strings.Builder{}
-	for _, todo := range todos {
-		if P.Selected != nil && P.Selected.GetId() == todo.GetId() {
-			strTodos.WriteString("> ")
-		} else {
-			strTodos.WriteString("- ")
+		case "up", "k":
+			if R.CursorPointer > 0 {
+				R.CursorPointer--
+			}
+
+		case "down", "j":
+			if R.CursorPointer < len(R.NotCompleted)-1 {
+				R.CursorPointer++
+			}
+
+		case "enter", " ":
+			R.Selected = &R.NotCompleted[R.CursorPointer]
 		}
-		strTodos.WriteString(todo.GetTitle())
-		strTodos.WriteString("\n")
 	}
 
-	return pterm.DefaultBox.WithTitle("Not Completed").Sprint(strTodos.String())
+	return R, nil
 }
 
-func (P *PTermRenderer) sprintDetailsPanel(todo *Todo) string {
-	if nil == todo {
-		return pterm.DefaultBox.WithTitle("<None>").Sprint("No todo selected")
+func (R *TeaRenderer) View() string {
+	s := "Your todos:\n\n"
+
+	for i, choice := range R.NotCompleted {
+
+		cursor := " "
+		if R.CursorPointer == i {
+			cursor = ">"
+		}
+
+		if R.Selected != nil && R.Selected.Id == choice.Id {
+			cursor = "X"
+		}
+
+		// Render the row
+		s += fmt.Sprintf("%s %s\n", cursor, choice.Title)
 	}
 
-	return pterm.DefaultBox.WithTitle(todo.GetTitle()).Sprint(todo.GetDescription())
+	// The footer
+	s += "\nPress q to quit.\n"
+
+	// Send the UI for rendering
+	return s
+}
+
+func (R *TeaRenderer) loadNotCompleted() {
+	notCompleted, _ := R.Service.GetUncompleted()
+	R.NotCompleted = notCompleted
+}
+
+func (R *TeaRenderer) updateSelected() {
+	if R.CursorPointer == 0 && len(R.NotCompleted) <= 0 {
+		R.CursorPointer = -1
+	}
 }
